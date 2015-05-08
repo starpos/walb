@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="WalB : Block-level WAL for Efficient Backup and Replication">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>WalB</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/starpos/walb">View on GitHub</a>
+
+          <h1 id="project_title">WalB</h1>
+          <h2 id="project_tagline">Block-level WAL for Efficient Backup and Replication</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/starpos/walb/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/starpos/walb/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h2>
+<a id="what-is-walb" class="anchor" href="#what-is-walb" aria-hidden="true"><span class="octicon octicon-link"></span></a>What is WalB?</h2>
+
+<p>WalB is a Linux kernel module and its related userland tools
+for incremental backup and asynchronous replication of storage devices.</p>
+
+<p>WalB was named after Block-level Write-Ahead Logging (WAL).</p>
+
+<h2>
+<a id="characteristics" class="anchor" href="#characteristics" aria-hidden="true"><span class="octicon octicon-link"></span></a>Characteristics</h2>
+
+<ul>
+<li>Block-level solution.</li>
+<li>Small performance overhead.</li>
+<li>Submitted order of write IOs will be preserved.</li>
+</ul>
+
+<h2>
+<a id="functionalities" class="anchor" href="#functionalities" aria-hidden="true"><span class="octicon octicon-link"></span></a>Functionalities</h2>
+
+<ul>
+<li>Online extraction of the logs, which you can replay on other block devices.</li>
+<li>Online resize of a walb device.</li>
+<li>Online WAL reset with adjusting to new log device size.</li>
+<li>
+<del>Snapshot management</del>. You cannot access to snapshot images directly.</li>
+</ul>
+
+<h2>
+<a id="architecture" class="anchor" href="#architecture" aria-hidden="true"><span class="octicon octicon-link"></span></a>Architecture</h2>
+
+<ul>
+<li>A walb device is wrapper of two underlying block devices, log and data.</li>
+<li>A walb device behaves as a consistent block device.
+
+<ul>
+<li>Write IOs will be stored in the log device as redo-logs and in the data device with no change.</li>
+<li>Read IOs will be just forward to the data device in almost cases.</li>
+</ul>
+</li>
+<li>Almost all space of a log device is a ring buffer to store logs for write IOs.</li>
+<li>Stored logs can be retrieved from the log device using sequential read.</li>
+</ul>
+
+<h2>
+<a id="pros-and-cons" class="anchor" href="#pros-and-cons" aria-hidden="true"><span class="octicon octicon-link"></span></a>Pros and Cons</h2>
+
+<h3>
+<a id="pros" class="anchor" href="#pros" aria-hidden="true"><span class="octicon octicon-link"></span></a>Pros</h3>
+
+<ul>
+<li>Negligible overhead for read IOs.</li>
+<li>Small overhead for write IOs.
+
+<ul>
+<li>Response time: almost the same as that of the underlying devices.</li>
+<li>Throughput: almost the same as that of the underlying devices, when the log and data devices are independent physically and the bandwidth of HBA is enough (2x + alpha).</li>
+</ul>
+</li>
+<li>You can use any filesystems on a walb device.</li>
+<li>You can get portable and consistent diff files from logs.
+You can store them for backup, compress and transfer them for remote replication, as you like.</li>
+</ul>
+
+<h3>
+<a id="cons" class="anchor" href="#cons" aria-hidden="true"><span class="octicon octicon-link"></span></a>Cons</h3>
+
+<ul>
+<li>WalB uses more than 2x bandwidth for writes.</li>
+<li>A walb device requires additional storage space for logs.</li>
+<li>You cannot access to snapshot images with a walb device only.</li>
+</ul>
+
+<h2>
+<a id="compared-with-similar-solutions" class="anchor" href="#compared-with-similar-solutions" aria-hidden="true"><span class="octicon octicon-link"></span></a>Compared with similar solutions</h2>
+
+<h3>
+<a id="dm-snap" class="anchor" href="#dm-snap" aria-hidden="true"><span class="octicon octicon-link"></span></a>dm-snap</h3>
+
+<ul>
+<li>Snapshot management.
+
+<ul>
+<li>dm-snap supports snapshot management using COW (copy-on-write).</li>
+<li>WalB does not support access to snapshot images.</li>
+</ul>
+</li>
+<li>Incremental backup
+
+<ul>
+<li>dm-snap does not support incremental backup. Full-scan will be required.</li>
+<li>WalB supports incremental backup without full-scan of volumes.</li>
+</ul>
+</li>
+</ul>
+
+<h3>
+<a id="dm-thin" class="anchor" href="#dm-thin" aria-hidden="true"><span class="octicon octicon-link"></span></a>dm-thin</h3>
+
+<ul>
+<li>Thin-provisioning.
+
+<ul>
+<li>dm-thin supports thin-provisioning.</li>
+<li>WalB does not support thin-provisioning.</li>
+</ul>
+</li>
+<li>Snapshot management.
+
+<ul>
+<li>dm-thin supports snapshot management using persistent address indexes.</li>
+<li>WalB does not support access to snapshot images
+because it does not maintain persistent indexes.
+Walb devices do not suffer from performance overhead to maintain persistent indexes.</li>
+</ul>
+</li>
+<li>Diff extraction for incremental backup and asynchronous replication.
+
+<ul>
+<li>dm-thin supports retrieving changed blocks information to get diffs.</li>
+<li>WalB supports direct extraction of logs (can be diffs) with a sequential scan of log devices.</li>
+</ul>
+</li>
+<li>Fragmentation management.
+
+<ul>
+<li>Using dm-thin devices, fragmentation will occur at block level.
+Fragmentation causes performance degradation.
+A clever GC/reorganization algorithm will be required to solve the issue, for which
+extra IOs will be required of course.</li>
+<li>A walb device stores logs in its ring buffer and the oldest logs will be overwritten
+automatically without extra IOs.
+In addition, walb does not need persistent address indexes,
+which is address space conversion maps between
+a walb device and its underlying data device,
+so block-level fragmentation does not occur.
+That is, walb devices do not need explicit GC/reorganization at block level.</li>
+</ul>
+</li>
+</ul>
+
+<h3>
+<a id="drbd" class="anchor" href="#drbd" aria-hidden="true"><span class="octicon octicon-link"></span></a>DRBD</h3>
+
+<ul>
+<li>Incremental backup.
+
+<ul>
+<li>DRBD does not support incremental backup.
+It does not have functionality to retrieve portable/consistent diff files.
+Full-scan of volumes will be required for backup.</li>
+<li>WalB supports incremental backup without full-scan.</li>
+</ul>
+</li>
+<li>Replication.
+
+<ul>
+<li>DRBD supports both synchronous and asynchronous replication.</li>
+<li>WalB enables asynchronous replication using logs.
+WalB does not support synchronous replication.</li>
+</ul>
+</li>
+<li>Long-distance replication.
+
+<ul>
+<li>A DRBD device uses limited-size socket buffer, so IO performance will decrease
+when the buffer is likely to be full in long-distance asynchronous replication.
+DRBD-proxy, for which another license is required, will solve the issue.</li>
+<li>A walb device can store much IOs to be sent to a remote site in its ring buffer.
+Therefore IO performance will not decrease due to long distance.
+However, read IOs for logs extraction may affect performance.
+Currently walb does not have buffers for log extraction effectively,
+while underlying storage caches will help it.</li>
+</ul>
+</li>
+</ul>
+
+<h3>
+<a id="log-structured-file-systems" class="anchor" href="#log-structured-file-systems" aria-hidden="true"><span class="octicon octicon-link"></span></a>Log-structured file systems</h3>
+
+<p>Ex. nilfs, btrfs, (or ZFS).</p>
+
+<ul>
+<li>WalB is a block-level solution, not a file system one.</li>
+<li>If you use whichever file system, you can backup your data incrementally
+and replicate them asynchronously using an underlying walb device.</li>
+</ul>
+
+<h2>
+<a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span class="octicon octicon-link"></span></a>Authors and Contributors</h2>
+
+<p><a href="https://github.com/starpos/">starpos</a>, <a href="https://github.com/herumi/">herumi</a></p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">WalB maintained by <a href="https://github.com/starpos">starpos</a></p>
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
